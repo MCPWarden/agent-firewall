@@ -1,0 +1,48 @@
+{
+  "name": "mcpwarden",
+  "displayName": "MCPWarden",
+  "description": "Silent AI agent firewall",
+  "version": "1.0.0",
+  "publisher": "mcpwarden",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "mcpwarden.start",      "title": "MCPWarden: Start" },
+      { "command": "mcpwarden.stop",       "title": "MCPWarden: Stop" },
+      { "command": "mcpwarden.showLog",    "title": "MCPWarden: Show Audit Log" },
+      { "command": "mcpwarden.openPolicy", "title": "MCPWarden: Edit Policy" },
+      { "command": "mcpwarden.resetStats", "title": "MCPWarden: Reset Counter" }
+    ],
+    "configuration": {
+      "title": "MCPWarden",
+      "properties": {
+        "mcpwarden.autoStart": {
+          "type": "boolean", "default": true,
+          "description": "Auto-start when VSCode opens"
+        },
+        "mcpwarden.pythonPath": {
+          "type": "string", "default": "",
+          "description": "Python path (leave empty to auto-detect)"
+        },
+        "mcpwarden.showNotifications": {
+          "type": "boolean", "default": true,
+          "description": "Show notifications when blocked"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}

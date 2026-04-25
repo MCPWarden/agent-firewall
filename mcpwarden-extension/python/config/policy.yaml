@@ -1,0 +1,221 @@
+meta:
+  version: '2.0'
+  profile: strict
+  log_level: verbose
+  audit_file: logs/audit.jsonl
+global:
+  default_deny: true
+  interactive_prompt: true
+  hard_block:
+  - rm -rf /
+  - rm -rf ~/
+  - '> /etc/passwd'
+  - '> /etc/sudoers'
+  - chmod 777
+  - mkfs*
+  - :(){ :|:& };:*
+file_read:
+  allowed_paths:
+  - ~/Desktop/**
+  - ~/Documents/**
+  - /tmp/**
+  - ${PROJECT_ROOT}/**
+  blocked_paths:
+  - ~/.ssh/**
+  - ~/.aws/**
+  - ~/.gnupg/**
+  - ~/.config/gcloud/**
+  - ~/Library/Keychains/**
+  - ~/Library/Application Support/1Password/**
+  - '**/.env'
+  - '**/.env.*'
+  - '**/secrets.*'
+  - '**/credentials*'
+  - /etc/passwd
+  - /etc/shadow
+  - /private/**
+  - ~/Downloads/**
+  warn_patterns:
+  - '**/*.pem'
+  - '**/*.key'
+  - '**/*.p12'
+  - '**/id_rsa'
+  - '**/id_ed25519'
+file_write:
+  require_confirmation: true
+  allowed_paths:
+  - ~/Desktop/**
+  - /tmp/**
+  - ${PROJECT_ROOT}/**
+  blocked_paths:
+  - ~/.ssh/**
+  - ~/.aws/**
+  - ~/.zshrc
+  - ~/.bashrc
+  - ~/.profile
+  - ~/.bash_profile
+  - ~/.gitconfig
+  - /etc/**
+  - /usr/**
+  - /bin/**
+  - /sbin/**
+  - ~/Library/**
+  - /Library/**
+  - ~/Downloads/**
+  max_file_size: 10485760
+file_delete:
+  require_confirmation: true
+  blocked_paths:
+  - ~/**
+  - /etc/**
+  - /usr/**
+  auto_allowed_paths:
+  - /tmp/**
+bash:
+  always_allowed:
+  - pattern: ^echo\s
+    reason: echo command
+  - pattern: ^pwd$
+    reason: print working directory
+  - pattern: ^ls\s+/tmp
+    reason: list /tmp
+  - pattern: ^cat\s+/tmp/
+    reason: read from /tmp
+  blocked_commands:
+  - pattern: rm\s+(-rf?|-r|-f)\s*(~/|/)
+    reason: Recursive or root-level delete
+  - pattern: dd\s+.*of=(/dev|/etc|/usr|/bin)
+    reason: Direct disk write to system path
+  - pattern: mkfs
+    reason: Filesystem formatting
+  - pattern: :\(\)\s*\{.*\}
+    reason: Fork bomb
+  - pattern: shred\s+.*(/etc|/usr|/bin|~/)
+    reason: Secure wipe of system or home path
+  - pattern: sudo\s+
+    reason: Privilege escalation not allowed
+  - pattern: su\s+-
+    reason: User switching not allowed
+  - pattern: doas\s+
+    reason: Privilege escalation (doas) not allowed
+  - pattern: csrutil\s+disable
+    reason: Disabling macOS SIP not allowed
+  - pattern: defaults\s+write.*globalstate
+    reason: Modifying macOS firewall settings
+  - pattern: curl.*(http|https|ftp).*\|.*(bash|sh|python|perl|ruby)
+    reason: Pipe remote content to shell
+  - pattern: wget.*(http|https).*\|.*(bash|sh)
+    reason: Pipe downloaded content to shell
+  - pattern: wget.*-O.*&&.*chmod
+    reason: Download and make executable
+  - pattern: curl.*-o.*/tmp/.*&&.*chmod
+    reason: Download to /tmp and make executable
+  - pattern: nc\s+(-e|-c|.*[0-9]{1,3}\.[0-9]{1,3})
+    reason: Netcat reverse shell or remote connection
+  - pattern: /dev/tcp/
+    reason: Bash TCP reverse shell
+  - pattern: socket.*connect.*subprocess
+    reason: Python reverse shell pattern
+  - pattern: python.*-c.*socket
+    reason: Python one-liner with socket (reverse shell)
+  - pattern: crontab\s+(-e|-l.*\|.*crontab|-r)
+    reason: Modifying cron jobs
+  - pattern: crontab\s+-
+    reason: Crontab modification
+  - pattern: launchctl\s+(load|unload|enable|disable|submit)
+    reason: Modifying macOS launch daemons
+  - pattern: systemctl\s+(enable|disable|start|stop|mask).*
+    reason: Modifying systemd units
+  - pattern: chmod\s+777
+    reason: Insecure permission change
+  - pattern: base64\s+(-d|--decode).*\|.*(bash|sh|python)
+    reason: Base64 decode and execute
+  - pattern: echo.*base64.*\|.*base64.*-d.*\|
+    reason: Base64 decode-pipe chain
+  - pattern: eval\s*\(
+    reason: eval() on dynamic input
+  - pattern: python.*eval.*base64
+    reason: Python eval with base64 decode
+  - pattern: printf.*\\x.*\|.*(bash|sh)
+    reason: Hex escape decode and execute
+  - pattern: \$\(printf.*\\x
+    reason: Hex escape command substitution
+  - pattern: IFS=.*cmd=.*\$cmd
+    reason: IFS evasion technique
+  - pattern: cat\s+.*\.ssh/
+    reason: Reading SSH keys via cat
+  - pattern: cat\s+.*\.env
+    reason: Reading .env via cat
+  - pattern: cat\s+.*\.aws/
+    reason: Reading AWS credentials via cat
+  - pattern: printenv.*(TOKEN|SECRET|KEY|PASS|API)
+    reason: Printing secret environment variables
+  - pattern: env\s*\|\s*(grep|awk|sed).*(KEY|SECRET|TOKEN|PASS|API)
+    reason: Searching env for secrets
+  - pattern: curl.*-d\s+@~
+    reason: POSTing file contents to external server
+  - pattern: curl.*\$\(cat.*\)\..*\.com
+    reason: DNS exfiltration via curl
+  - pattern: curl.*(-X POST|--data).*http
+    reason: curl POST to external URL
+  - pattern: npm\s+install\s+--global
+    reason: Global npm install
+  - pattern: npm\s+install.*event-stream
+    reason: Known malicious npm package
+  - pattern: pip\s+install\s+reequests
+    reason: Typosquatted pip package
+  warn_commands:
+  - pattern: pip\s+install\s+--user
+    reason: User-wide pip install
+  - pattern: git\s+push.*--force
+    reason: Force push to git remote
+  - pattern: kill\s+-9
+    reason: Force-killing process
+  - pattern: curl\s+http
+    reason: "curl to external URL (not piped \u2014 verify intent)"
+  - pattern: wget\s+http
+    reason: "wget from external URL (not piped \u2014 verify intent)"
+network:
+  blocked_domains:
+  - '*.ngrok.io'
+  - '*.ngrok-free.app'
+  - '*.requestbin.com'
+  - '*.webhook.site'
+  - '*.burpcollaborator.net'
+  - evil.example.com
+  - malware.example.com
+  - attacker.example.com
+  - setup.internal-tools.dev
+  - logs.company-monitor.net
+  - update.sys-monitor.net
+  - backup.sys-monitor.net
+  allowlist_mode: false
+  allowed_domains:
+  - api.github.com
+  - pypi.org
+  - registry.npmjs.org
+  - www.google.com
+  - google.com
+  require_https: true
+env_access:
+  blocked_patterns:
+  - '*_SECRET*'
+  - '*_TOKEN*'
+  - '*_KEY*'
+  - '*_PASSWORD*'
+  - '*_PASS*'
+  - '*_PRIVATE*'
+  - AWS_*
+  - GCP_*
+  - AZURE_*
+  - OPENAI_*
+  - ANTHROPIC_*
+  - GITHUB_*
+  - STRIPE_*
+  - DATABASE_*
+  - DB_*
+notifications:
+  macos_notify: true
+  notify_on:
+  - block
+  - warn
