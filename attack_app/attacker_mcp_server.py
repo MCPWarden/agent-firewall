@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
 attack_app/attacker_mcp_server.py
-Simulates a naive third-party MCP server with zero security checks.
-The Agent Firewall proxy intercepts every call before it reaches here.
+Naive third-party MCP server — zero security checks.
+Now includes fetch_url for web access.
 """
 
 import json
 import os
 import subprocess
 import sys
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 
@@ -69,6 +71,19 @@ TOOLS = [
             "required": ["path"],
         },
     },
+    {
+        "name": "fetch_url",
+        "description": "Fetch content from a URL (web scraping / HTTP requests).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url":           {"type": "string", "description": "Full URL to fetch"},
+                "max_chars":     {"type": "integer", "default": 2000,
+                                  "description": "Max characters of response to return"},
+            },
+            "required": ["url"],
+        },
+    },
 ]
 
 
@@ -100,8 +115,7 @@ def handle_run_command(args):
 def handle_read_env(args):
     name = args["name"]
     val  = os.environ.get(name)
-    text = f"{name}={val}" if val else f"{name} is not set"
-    return {"content": [{"type": "text", "text": text}]}
+    return {"content": [{"type": "text", "text": f"{name}={val}" if val else f"{name} is not set"}]}
 
 def handle_list_directory(args):
     try:
@@ -111,12 +125,45 @@ def handle_list_directory(args):
     except Exception as e:
         return {"isError": True, "content": [{"type": "text", "text": str(e)}]}
 
+def handle_fetch_url(args):
+    url       = args["url"]
+    max_chars = int(args.get('max_chars', 2000))
+    try:
+        import ssl as _ssl
+        # Bypass macOS cert store — required for demo on macOS without cert install
+        ctx = _ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode    = _ssl.CERT_NONE
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "MCPWarden/1.0"},
+        )
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+            raw          = resp.read(max_chars * 4)
+            content_type = resp.headers.get("Content-Type", "")
+            charset      = "utf-8"
+            if "charset=" in content_type:
+                charset = content_type.split("charset=")[-1].split(";")[0].strip()
+            text = raw.decode(charset, errors='replace')[:max_chars]
+            return {
+                "content": [{"type": "text",
+                             "text": f"[{resp.status} {resp.reason}]  {url}\n\n{text}"}]
+            }
+    except urllib.error.HTTPError as e:
+        return {"isError": True,
+                "content": [{"type": "text", "text": f"HTTP {e.code}: {e.reason}  {url}"}]}
+    except urllib.error.URLError as e:
+        return {"isError": True,
+                "content": [{"type": "text", "text": f"URL error: {e.reason}  {url}"}]}
+    except Exception as e:
+        return {"isError": True, "content": [{"type": "text", "text": str(e)}]}
+
 DISPATCH = {
     "read_file":      handle_read_file,
     "write_file":     handle_write_file,
     "run_command":    handle_run_command,
     "read_env":       handle_read_env,
     "list_directory": handle_list_directory,
+    "fetch_url":      handle_fetch_url,
 }
 
 def main():
@@ -135,7 +182,7 @@ def main():
 
         if method == "initialize":
             _result(msg_id, {"protocolVersion": "2024-11-05",
-                             "serverInfo": {"name": "attacker-mcp", "version": "1.0.0"},
+                             "serverInfo": {"name": "attacker-mcp", "version": "1.1.0"},
                              "capabilities": {"tools": {}}})
         elif method == "tools/list":
             _result(msg_id, {"tools": TOOLS})
