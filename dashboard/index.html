@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCPWarden — The warden between AI agents and everything they shouldn't touch.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Theme Variables ───────────────────────────────────────────────────────── */
+:root {
+  --green:        #10b981;
+  --green-b:      #34d399;
+  --green-glow:   rgba(16,185,129,.2);
+  --red:          #ef4444;
+  --red-b:        #f87171;
+  --red-glow:     rgba(239,68,68,.2);
+  --blue:         #3b82f6;
+  --blue-b:       #60a5fa;
+  --blue-glow:    rgba(59,130,246,.2);
+  --purple:       #8b5cf6;
+  --purple-b:     #a78bfa;
+  --purple-glow:  rgba(139,92,246,.2);
+  --amber:        #f59e0b;
+  --cyan:         #06b6d4;
+  --radius:       14px;
+  --radius-s:     8px;
+}
+
+[data-theme="dark"] {
+  --bg:         #04060f;
+  --card:       rgba(255,255,255,0.030);
+  --card-hover: rgba(255,255,255,0.050);
+  --border:     rgba(255,255,255,0.070);
+  --border-hi:  rgba(255,255,255,0.140);
+  --text:       #e2e8f0;
+  --muted:      #64748b;
+  --dim:        #334155;
+  --dot-color:  rgba(255,255,255,.032);
+  --shadow:     0 1px 3px rgba(0,0,0,.5);
+  --topbar-bg:  rgba(4,6,15,.88);
+  --chart-grid: rgba(255,255,255,0.045);
+  --chart-text: #64748b;
+  --footer-bg:  rgba(255,255,255,0.015);
+  --scroll-thumb: rgba(255,255,255,0.12);
+}
+
+[data-theme="light"] {
+  --bg:         #f1f5f9;
+  --card:       rgba(255,255,255,0.85);
+  --card-hover: rgba(255,255,255,1);
+  --border:     rgba(0,0,0,0.07);
+  --border-hi:  rgba(0,0,0,0.14);
+  --text:       #0f172a;
+  --muted:      #64748b;
+  --dim:        #94a3b8;
+  --dot-color:  rgba(0,0,0,.04);
+  --shadow:     0 1px 4px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --topbar-bg:  rgba(241,245,249,.92);
+  --chart-grid: rgba(0,0,0,0.06);
+  --chart-text: #64748b;
+  --footer-bg:  rgba(0,0,0,0.02);
+  --scroll-thumb: rgba(0,0,0,0.15);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--dot-color) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color .3s, color .3s;
+}
+
+/* Ambient glows — dark only */
+[data-theme="dark"] body::before,
+[data-theme="dark"] body::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(130px);
+}
+[data-theme="dark"] body::before {
+  width: 800px; height: 800px;
+  top: -300px; left: -300px;
+  background: radial-gradient(circle, rgba(59,130,246,.08) 0%, transparent 65%);
+}
+[data-theme="dark"] body::after {
+  width: 650px; height: 650px;
+  bottom: -200px; right: -200px;
+  background: radial-gradient(circle, rgba(139,92,246,.06) 0%, transparent 65%);
+}
+
+/* ── Topbar ────────────────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 200;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-mark {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff;
+  letter-spacing: -.5px;
+  flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(59,130,246,.35);
+}
+
+.brand-text { display: flex; flex-direction: column; gap: 1px; }
+
+.brand-name {
+  font-size: 14px; font-weight: 700;
+  background: linear-gradient(135deg, var(--blue-b), var(--purple-b));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -.3px; line-height: 1;
+}
+
+.brand-tagline {
+  font-size: 10px; color: var(--muted); font-weight: 400; line-height: 1;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.theme-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px; font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.theme-btn:hover { border-color: var(--border-hi); color: var(--text); }
+
+/* theme icon inline svg */
+.theme-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+.live-pill {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 5px 14px;
+  font-size: 12px; color: var(--muted); font-weight: 500;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+}
+.live-dot.live { animation: dotpulse 2s infinite; }
+.live-dot.off  { background: var(--red); animation: none; }
+@keyframes dotpulse {
+  0%,100% { opacity: 1; }
+  50%     { opacity: .35; }
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────────── */
+.main {
+  position: relative; z-index: 1;
+  padding: 24px 28px 32px;
+  max-width: 1600px; margin: 0 auto;
+}
+
+.row { display: flex; gap: 16px; margin-bottom: 16px; }
+.row:last-child { margin-bottom: 0; }
+.col-3  { flex: 3; min-width: 0; }
+.col-4  { flex: 4; min-width: 0; }
+.col-6  { flex: 6; min-width: 0; }
+.col-8  { flex: 8; min-width: 0; }
+.col-12 { flex: 12; min-width: 0; }
+
+/* ── Cards ─────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: border-color .2s, background .3s, box-shadow .2s;
+}
+.card:hover { border-color: var(--border-hi); }
+.card-body { padding: 22px 24px; }
+
+/* ── Stat Cards ────────────────────────────────────────────────────────────── */
+.stat-card { position: relative; overflow: hidden; }
+
+.stat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: var(--radius) var(--radius) 0 0; opacity: .75;
+}
+.stat-card.blue::before   { background: linear-gradient(90deg, var(--blue),   transparent); }
+.stat-card.green::before  { background: linear-gradient(90deg, var(--green),  transparent); }
+.stat-card.red::before    { background: linear-gradient(90deg, var(--red),    transparent); }
+.stat-card.purple::before { background: linear-gradient(90deg, var(--purple), transparent); }
+
+.stat-glow {
+  position: absolute; bottom: -50px; right: -50px;
+  width: 160px; height: 160px;
+  border-radius: 50%; filter: blur(55px);
+  opacity: .09; pointer-events: none;
+}
+[data-theme="light"] .stat-glow { opacity: .06; }
+.stat-card.blue   .stat-glow { background: var(--blue); }
+.stat-card.green  .stat-glow { background: var(--green); }
+.stat-card.red    .stat-glow { background: var(--red); }
+.stat-card.purple .stat-glow { background: var(--purple); }
+
+.stat-label {
+  font-size: 10.5px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px;
+}
+.stat-val {
+  font-size: 42px; font-weight: 800; line-height: 1;
+  letter-spacing: -2px; font-variant-numeric: tabular-nums;
+}
+.stat-card.blue   .stat-val { color: var(--blue-b); }
+.stat-card.green  .stat-val { color: var(--green-b); }
+.stat-card.red    .stat-val { color: var(--red-b); }
+.stat-card.purple .stat-val { color: var(--purple-b); }
+.stat-sub { margin-top: 8px; font-size: 12px; color: var(--dim); font-weight: 400; }
+
+/* ── Chart header ──────────────────────────────────────────────────────────── */
+.chart-header {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase;
+  letter-spacing: .7px; margin-bottom: 18px;
+}
+.chart-header::before {
+  content: '';
+  display: inline-block; width: 3px; height: 13px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, var(--blue), var(--purple));
+  flex-shrink: 0;
+}
+
+/* ── Section header ────────────────────────────────────────────────────────── */
+.section-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+}
+.section-title  { font-size: 13px; font-weight: 600; color: var(--text); }
+.section-sub    { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+
+/* ── Filter Strip ──────────────────────────────────────────────────────────── */
+.filter-strip { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.fbtn {
+  padding: 6px 15px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px; font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all .2s; letter-spacing: .1px;
+}
+.fbtn:hover { color: var(--text); border-color: var(--border-hi); }
+.fbtn.active[data-cat="all"]        { background: rgba(59,130,246,.15);  border-color: rgba(59,130,246,.4);  color: var(--blue-b);   }
+.fbtn.active[data-cat="filesystem"] { background: rgba(59,130,246,.15);  border-color: rgba(59,130,246,.4);  color: var(--blue-b);   }
+.fbtn.active[data-cat="network"]    { background: rgba(139,92,246,.15);  border-color: rgba(139,92,246,.4);  color: var(--purple-b); }
+.fbtn.active[data-cat="credential"] { background: rgba(245,158,11,.15);  border-color: rgba(245,158,11,.4);  color: #fbbf24;         }
+.fbtn.active[data-cat="shell"]      { background: rgba(6,182,212,.15);   border-color: rgba(6,182,212,.4);   color: #67e8f9;         }
+.fbtn.active[data-cat="unknown"]    { background: rgba(100,116,139,.15); border-color: rgba(100,116,139,.4); color: #94a3b8;         }
+[data-theme="light"] .fbtn.active { filter: saturate(1.2); }
+
+/* ── Activity Table ────────────────────────────────────────────────────────── */
+.act-scroll {
+  max-height: 380px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-s);
+}
+.act-scroll::-webkit-scrollbar { width: 5px; }
+.act-scroll::-webkit-scrollbar-track { background: transparent; }
+.act-scroll::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; }
+
+table.act { width: 100%; border-collapse: collapse; }
+
+table.act thead th {
+  position: sticky; top: 0;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(10px);
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .7px;
+  color: var(--muted);
+  padding: 10px 14px; text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+table.act tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .12s;
+}
+table.act tbody tr:last-child { border-bottom: none; }
+table.act tbody tr:hover { background: var(--card-hover); }
+
+table.act td {
+  padding: 9px 14px; font-size: 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  vertical-align: middle; color: var(--text);
+}
+
+table.act .empty-row td {
+  text-align: center; color: var(--muted);
+  padding: 48px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 400;
+}
+
+/* Row animation */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes flashGreen { 0% { background: rgba(16,185,129,.1); } 100% { background: transparent; } }
+@keyframes flashRed   { 0% { background: rgba(239,68,68,.09); } 100% { background: transparent; } }
+
+tr.new-allow { animation: slideIn .25s ease, flashGreen 1.8s ease forwards; }
+tr.new-block { animation: slideIn .25s ease, flashRed   1.8s ease forwards; }
+
+/* ── Badges ────────────────────────────────────────────────────────────────── */
+.vbadge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; font-family: 'Inter', sans-serif;
+  white-space: nowrap; letter-spacing: .2px;
+}
+.vbadge.allow { background: rgba(16,185,129,.12); color: var(--green-b); border: 1px solid rgba(16,185,129,.22); }
+.vbadge.block { background: rgba(239,68,68,.12);  color: var(--red-b);   border: 1px solid rgba(239,68,68,.22);  }
+[data-theme="light"] .vbadge.allow { background: rgba(16,185,129,.1);  color: #059669; }
+[data-theme="light"] .vbadge.block { background: rgba(239,68,68,.1);   color: #dc2626; }
+
+.catbadge {
+  display: inline-block; padding: 2px 9px; border-radius: 20px;
+  font-size: 10px; font-weight: 600; font-family: 'Inter', sans-serif;
+  text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+}
+.catbadge.filesystem { background: rgba(59,130,246,.12);  color: var(--blue-b); }
+.catbadge.network    { background: rgba(139,92,246,.12);  color: var(--purple-b); }
+.catbadge.credential { background: rgba(245,158,11,.12);  color: #fbbf24; }
+.catbadge.shell      { background: rgba(6,182,212,.12);   color: #67e8f9; }
+.catbadge.unknown    { background: rgba(100,116,139,.12); color: #94a3b8; }
+[data-theme="light"] .catbadge.filesystem { color: #2563eb; }
+[data-theme="light"] .catbadge.network    { color: #7c3aed; }
+[data-theme="light"] .catbadge.credential { color: #d97706; }
+[data-theme="light"] .catbadge.shell      { color: #0891b2; }
+
+.cell-trunc { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.cell-time  { color: var(--dim); white-space: nowrap; }
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+footer {
+  position: relative; z-index: 1;
+  background: var(--footer-bg);
+  border-top: 1px solid var(--border);
+  transition: background .3s;
+}
+.footer-inner {
+  max-width: 1600px; margin: 0 auto;
+  padding: 20px 28px;
+  display: flex; align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap; gap: 14px;
+}
+.footer-brand {
+  display: flex; align-items: center; gap: 10px;
+}
+.footer-mark {
+  width: 22px; height: 22px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 800; color: #fff; letter-spacing: -.3px;
+  flex-shrink: 0;
+}
+.footer-name  { font-size: 13px; font-weight: 600; color: var(--text); }
+.footer-sep   { color: var(--border-hi); font-size: 13px; }
+.footer-desc  { font-size: 12px; color: var(--muted); }
+.footer-right { font-size: 11px; color: var(--dim); text-align: right; }
+.footer-right a { color: var(--muted); text-decoration: none; }
+.footer-right a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- ── Topbar ────────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">MW</div>
+    <div class="brand-text">
+      <span class="brand-name">MCPWarden</span>
+      <span class="brand-tagline">Agent Firewall Dashboard</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">
+      <svg id="themeIcon" viewBox="0 0 24 24">
+        <!-- sun (shown in dark mode to switch to light) -->
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="2" x2="12" y2="4"/>
+        <line x1="12" y1="20" x2="12" y2="22"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="2" y1="12" x2="4" y2="12"/>
+        <line x1="20" y1="12" x2="22" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <span id="themeBtnLabel">Light Mode</span>
+    </button>
+    <div class="live-pill">
+      <div class="live-dot off" id="liveDot"></div>
+      <span id="liveLabel">Connecting</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main ──────────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Stat cards -->
+  <div class="row">
+    <div class="col-3 card stat-card blue">
+      <div class="stat-glow"></div>
+      <div class="card-body">
+        <div class="stat-label">Total Calls</div>
+        <div class="stat-val" id="sTotal">0</div>
+        <div class="stat-sub">intercepted by proxy</div>
+      </div>
+    </div>
+    <div class="col-3 card stat-card green">
+      <div class="stat-glow"></div>
+      <div class="card-body">
+        <div class="stat-label">Allowed</div>
+        <div class="stat-val" id="sAllowed">0</div>
+        <div class="stat-sub">passed through</div>
+      </div>
+    </div>
+    <div class="col-3 card stat-card red">
+      <div class="stat-glow"></div>
+      <div class="card-body">
+        <div class="stat-label">Blocked</div>
+        <div class="stat-val" id="sBlocked">0</div>
+        <div class="stat-sub">denied by policy</div>
+      </div>
+    </div>
+    <div class="col-3 card stat-card purple">
+      <div class="stat-glow"></div>
+      <div class="card-body">
+        <div class="stat-label">Block Rate</div>
+        <div class="stat-val" id="sRate">0%</div>
+        <div class="stat-sub">of all operations</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline + Donut -->
+  <div class="row">
+    <div class="col-8 card">
+      <div class="card-body">
+        <div class="chart-header">Activity Timeline</div>
+        <canvas id="lineChart" height="100"></canvas>
+      </div>
+    </div>
+    <div class="col-4 card">
+      <div class="card-body">
+        <div class="chart-header">Allow vs Block</div>
+        <canvas id="donutChart" height="195"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity table -->
+  <div class="row">
+    <div class="col-12 card">
+      <div class="card-body">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Recent Activity</div>
+            <div class="section-sub">Real-time feed of intercepted tool calls</div>
+          </div>
+          <div class="filter-strip">
+            <button class="fbtn active" data-cat="all">All</button>
+            <button class="fbtn" data-cat="filesystem">Filesystem</button>
+            <button class="fbtn" data-cat="network">Network</button>
+            <button class="fbtn" data-cat="credential">Credential</button>
+            <button class="fbtn" data-cat="shell">Shell</button>
+            <button class="fbtn" data-cat="unknown">Unknown</button>
+          </div>
+        </div>
+        <div class="act-scroll">
+          <table class="act">
+            <thead>
+              <tr>
+                <th>Time</th><th>Tool</th><th>Category</th>
+                <th>Verdict</th><th>Detail</th><th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="actBody">
+              <tr class="empty-row"><td colspan="6">No activity yet — start the proxy and run a scenario.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool + Category charts -->
+  <div class="row">
+    <div class="col-6 card">
+      <div class="card-body">
+        <div class="chart-header">Calls by Tool Type</div>
+        <canvas id="toolChart" height="130"></canvas>
+      </div>
+    </div>
+    <div class="col-6 card">
+      <div class="card-body">
+        <div class="chart-header">Calls by Category</div>
+        <canvas id="catChart" height="130"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-mark">MW</div>
+      <span class="footer-name">MCPWarden</span>
+      <span class="footer-sep">·</span>
+      <span class="footer-desc">The warden between AI agents and everything they shouldn't touch.</span>
+    </div>
+    <div class="footer-right">
+      v2.0 &nbsp;·&nbsp; © 2026 MCPWarden &nbsp;·&nbsp; Real-time MCP Firewall
+    </div>
+  </div>
+</footer>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const S = {
+  total: 0, allowed: 0, blocked: 0,
+  by_tool: {}, by_category: {}, timeline: {},
+  logs: [], filter: 'all',
+};
+
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  try { return new Date(ts).toLocaleTimeString('en-US',{hour12:false}); }
+  catch { return (ts||'').slice(11,19)||'—'; }
+}
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+function isDark() { return document.documentElement.dataset.theme === 'dark'; }
+
+function chartColors() {
+  return {
+    grid:   isDark() ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.06)',
+    ticks:  '#64748b',
+    legend: isDark() ? '#94a3b8' : '#64748b',
+  };
+}
+
+// Moon SVG for light mode (switch to dark)
+const MOON_SVG = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+const SUN_SVG  = `<circle cx="12" cy="12" r="5"/>
+  <line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
+  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+  <line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/>
+  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
+
+function applyThemeUI() {
+  const dark = isDark();
+  $('themeIcon').innerHTML = dark ? SUN_SVG : MOON_SVG;
+  $('themeBtnLabel').textContent = dark ? 'Light Mode' : 'Dark Mode';
+}
+
+function toggleTheme() {
+  const next = isDark() ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('mw-theme', next);
+  applyThemeUI();
+
+  const c = chartColors();
+  Chart.defaults.color = c.ticks;
+
+  const updateScale = chart => {
+    ['x','y'].forEach(axis => {
+      if (chart.options.scales?.[axis]) {
+        chart.options.scales[axis].grid.color  = c.grid;
+        chart.options.scales[axis].ticks.color = c.ticks;
+      }
+    });
+    chart.update('none');
+  };
+  [lineChart, toolChart, catChart].forEach(updateScale);
+  donutChart.update('none');
+}
+
+// Load saved theme
+const savedTheme = localStorage.getItem('mw-theme') || 'dark';
+document.documentElement.dataset.theme = savedTheme;
+applyThemeUI();
+
+// ── Chart defaults ────────────────────────────────────────────────────────────
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = chartColors().ticks;
+
+const TOOLTIP_OPTS = {
+  backgroundColor: isDark() ? 'rgba(4,6,15,.95)' : 'rgba(15,23,42,.92)',
+  borderColor:     isDark() ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.1)',
+  borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+  padding: 10, cornerRadius: 8, usePointStyle: true,
+};
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+const c = chartColors();
+
+const lineChart = new Chart($('lineChart'), {
+  type: 'line',
+  data: { labels: [], datasets: [
+    { label:'Allowed', data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.07)',
+      fill:true, tension:.45, pointRadius:3, pointHoverRadius:6,
+      pointBackgroundColor:'#10b981', borderWidth:2 },
+    { label:'Blocked', data:[], borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.06)',
+      fill:true, tension:.45, pointRadius:3, pointHoverRadius:6,
+      pointBackgroundColor:'#ef4444', borderWidth:2 },
+  ]},
+  options: {
+    responsive:true,
+    interaction:{ mode:'index', intersect:false },
+    plugins:{ legend:{ position:'top', labels:{ padding:16, boxWidth:10, usePointStyle:true, pointStyle:'circle' }}, tooltip: TOOLTIP_OPTS },
+    scales:{
+      x:{ grid:{ color: c.grid }, ticks:{ color: c.ticks, maxTicksLimit:10 }},
+      y:{ grid:{ color: c.grid }, ticks:{ color: c.ticks, stepSize:1 }, beginAtZero:true },
+    },
+  },
+});
+
+const donutChart = new Chart($('donutChart'), {
+  type:'doughnut',
+  data:{ labels:['Allowed','Blocked'], datasets:[{
+    data:[0,0],
+    backgroundColor:['rgba(16,185,129,.75)','rgba(239,68,68,.75)'],
+    borderColor:['rgba(16,185,129,1)','rgba(239,68,68,1)'],
+    borderWidth:2, hoverOffset:6,
+  }]},
+  options:{
+    responsive:true, cutout:'70%',
+    plugins:{ legend:{ position:'bottom', labels:{ padding:20, boxWidth:10, usePointStyle:true, pointStyle:'circle' }}, tooltip: TOOLTIP_OPTS },
+  },
+});
+
+const toolChart = new Chart($('toolChart'), {
+  type:'bar',
+  data:{ labels:[], datasets:[
+    { label:'Allowed', data:[], backgroundColor:'rgba(16,185,129,.7)', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
+    { label:'Blocked', data:[], backgroundColor:'rgba(239,68,68,.7)',  borderColor:'#ef4444', borderWidth:1, borderRadius:4 },
+  ]},
+  options:{
+    responsive:true,
+    scales:{
+      x:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks, maxRotation:0 }},
+      y:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks, stepSize:1 }, beginAtZero:true },
+    },
+    plugins:{ legend:{ position:'top', labels:{ padding:14, boxWidth:10, usePointStyle:true, pointStyle:'circle' }}, tooltip: TOOLTIP_OPTS },
+  },
+});
+
+const catChart = new Chart($('catChart'), {
+  type:'bar',
+  data:{ labels:[], datasets:[
+    { label:'Allowed', data:[], backgroundColor:'rgba(16,185,129,.7)', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
+    { label:'Blocked', data:[], backgroundColor:'rgba(239,68,68,.7)',  borderColor:'#ef4444', borderWidth:1, borderRadius:4 },
+  ]},
+  options:{
+    indexAxis:'y', responsive:true,
+    scales:{
+      x:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks, stepSize:1 }, beginAtZero:true },
+      y:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks }},
+    },
+    plugins:{ legend:{ display:false }, tooltip: TOOLTIP_OPTS },
+  },
+});
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function animateVal(el, target, suffix) {
+  const from = parseInt(el.textContent) || 0;
+  if (from === target) { el.textContent = target + (suffix||''); return; }
+  const steps = Math.min(Math.abs(target-from), 20);
+  const inc = (target - from) / steps;
+  let v = from, s = 0;
+  const tick = () => {
+    s++;
+    v += inc;
+    el.textContent = Math.round(s < steps ? v : target) + (suffix||'');
+    if (s < steps) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function renderStats() {
+  const rate = S.total ? Math.round(S.blocked / S.total * 100) : 0;
+  animateVal($('sTotal'),   S.total,   '');
+  animateVal($('sAllowed'), S.allowed, '');
+  animateVal($('sBlocked'), S.blocked, '');
+  $('sRate').textContent = rate + '%';
+}
+
+function renderCharts() {
+  // Donut
+  donutChart.data.datasets[0].data = [S.allowed, S.blocked];
+  donutChart.update('none');
+
+  // Line
+  const labels = Object.keys(S.timeline).sort().slice(-30);
+  lineChart.data.labels            = labels.map(k => k.slice(11,16));
+  lineChart.data.datasets[0].data  = labels.map(k => S.timeline[k]?.allow || 0);
+  lineChart.data.datasets[1].data  = labels.map(k => S.timeline[k]?.block || 0);
+  lineChart.update('none');
+
+  // Tool bar
+  const tools = Object.keys(S.by_tool).sort();
+  toolChart.data.labels            = tools;
+  toolChart.data.datasets[0].data  = tools.map(t => S.by_tool[t]?.allow || 0);
+  toolChart.data.datasets[1].data  = tools.map(t => S.by_tool[t]?.block || 0);
+  toolChart.update('none');
+
+  // Category bar
+  const cats = Object.keys(S.by_category).sort();
+  catChart.data.labels            = cats;
+  catChart.data.datasets[0].data  = cats.map(c => S.by_category[c]?.allow || 0);
+  catChart.data.datasets[1].data  = cats.map(c => S.by_category[c]?.block || 0);
+  catChart.update('none');
+}
+
+function makeRow(e, isNew) {
+  const tr  = document.createElement('tr');
+  const cat = e.category || 'unknown';
+  const v   = e.verdict  || 'unknown';
+  if (isNew) tr.classList.add(v === 'block' ? 'new-block' : 'new-allow');
+  tr.innerHTML =
+    `<td class="cell-time">${esc(fmtTime(e.ts))}</td>` +
+    `<td>${esc(e.tool||'—')}</td>` +
+    `<td><span class="catbadge ${esc(cat)}">${esc(cat)}</span></td>` +
+    `<td><span class="vbadge ${esc(v)}">${v==='allow'?'Allow':'Block'}</span></td>` +
+    `<td class="cell-trunc" title="${esc(e.detail)}">${esc(e.detail||'—')}</td>` +
+    `<td class="cell-trunc" title="${esc(e.reason)}">${esc(e.reason||'—')}</td>`;
+  return tr;
+}
+
+function renderTable(prepend) {
+  const body = $('actBody');
+  const f    = S.filter;
+
+  if (prepend !== undefined) {
+    const cat = prepend.category || 'unknown';
+    if (f === 'all' || cat === f) {
+      const empty = body.querySelector('.empty-row');
+      if (empty) body.innerHTML = '';
+      body.insertBefore(makeRow(prepend, true), body.firstChild);
+      while (body.children.length > 300) body.removeChild(body.lastChild);
+    }
+    return;
+  }
+
+  const visible = f === 'all' ? S.logs : S.logs.filter(e => (e.category||'unknown') === f);
+  if (!visible.length) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="6">No ${f === 'all' ? '' : f + ' '}activity yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = '';
+  [...visible].reverse().slice(0,300).forEach(e => body.appendChild(makeRow(e, false)));
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
+    const [sr, lr] = await Promise.all([fetch('/api/stats'), fetch('/api/logs')]);
+    const stats = await sr.json(), logs = await lr.json();
+    Object.assign(S, {
+      total: stats.total, allowed: stats.allowed, blocked: stats.blocked,
+      by_tool: stats.by_tool, by_category: stats.by_category,
+      timeline: stats.timeline || {}, logs,
+    });
+    renderStats(); renderCharts(); renderTable();
+  } catch(e) { console.error('boot:', e); }
+}
+
+// ── SSE ───────────────────────────────────────────────────────────────────────
+function connectSSE() {
+  const dot = $('liveDot'), lbl = $('liveLabel');
+  const es  = new EventSource('/api/stream');
+
+  es.onopen = () => { dot.classList.remove('off'); dot.classList.add('live'); lbl.textContent = 'Live'; };
+  es.onerror = () => { dot.classList.remove('live'); dot.classList.add('off'); lbl.textContent = 'Disconnected'; };
+
+  es.onmessage = evt => {
+    const e   = JSON.parse(evt.data);
+    const v   = e.verdict, t = e.tool || 'unknown', cat = e.category || 'unknown';
+    const min = (e.ts || new Date().toISOString()).slice(0,16);
+
+    S.logs.push(e); S.total++;
+    if (v === 'allow' || v === 'block') {
+      if (v === 'allow') S.allowed++; else S.blocked++;
+      S.by_tool[t]       ||= { allow:0, block:0 };
+      S.by_category[cat] ||= { allow:0, block:0 };
+      S.timeline[min]    ||= { allow:0, block:0 };
+      S.by_tool[t][v]++; S.by_category[cat][v]++; S.timeline[min][v]++;
+    }
+    renderStats(); renderCharts(); renderTable(e);
+  };
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('.fbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    S.filter = btn.dataset.cat;
+    renderTable();
+  });
+});
+
+boot().then(connectSSE);
+</script>
+</body>
+</html>
