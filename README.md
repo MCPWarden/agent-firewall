@@ -131,7 +131,7 @@ The dashboard updates live via Server-Sent Events — no refresh needed.
 - **Live activity feed** — Searchable, filterable table of every intercepted call
 
 ![Realtime Monitoring Dashboard]()
-[image](<img width="631" height="655" alt="Image" src="https://github.com/user-attachments/assets/820cbb7d-5972-4d3f-a11f-a4a87fec79a4" />)
+![image](<img width="631" height="655" alt="Image" src="https://github.com/user-attachments/assets/820cbb7d-5972-4d3f-a11f-a4a87fec79a4" />)
 
 ---
 
