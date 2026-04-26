@@ -45,16 +45,39 @@ header { background:var(--surface); border-bottom:1px solid var(--border);
            background-clip:text; }
 .hero p   { font-size:1.05rem; color:var(--dim); margin-bottom:2rem; }
 
-/* ── Stats ── */
-.stats { display:flex; justify-content:center; gap:1rem; flex-wrap:wrap; margin-bottom:2.5rem; }
-.stat  { background:var(--surface); border:1px solid var(--border);
-         border-radius:10px; padding:1.1rem 1.7rem; text-align:center; min-width:130px; }
-.stat-n { font-size:1.9rem; font-weight:700; font-family:var(--mono); line-height:1; margin-bottom:.25rem; }
-.stat-l { font-size:.75rem; color:var(--dim); text-transform:uppercase; letter-spacing:.5px; }
-.c-red   { color:var(--red); }
-.c-green { color:var(--green); }
-.c-blue  { color:var(--blue); }
-.c-white { color:var(--text); }
+/* ── CTA Banner ── */
+.cta-wrap { display:flex; justify-content:center; margin-bottom:2.5rem; }
+.cta-banner {
+  display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap; justify-content:center;
+  background:linear-gradient(135deg,rgba(31,111,235,.15),rgba(124,58,237,.1));
+  border:1px solid rgba(88,166,255,.3);
+  border-radius:16px; padding:1.4rem 2rem;
+  max-width:780px; width:100%;
+  box-shadow:0 0 40px rgba(88,166,255,.08);
+  position:relative; overflow:hidden;
+}
+.cta-banner::before {
+  content:''; position:absolute; top:0; left:0;
+  width:4px; height:100%;
+  background:linear-gradient(180deg,#58a6ff,#7c3aed);
+}
+.cta-icon { font-size:2rem; flex-shrink:0; }
+.cta-body { text-align:left; flex:1; min-width:200px; }
+.cta-new  { display:inline-block; background:linear-gradient(90deg,#58a6ff,#7c3aed);
+            color:#fff; font-size:.68rem; font-weight:700; letter-spacing:1px;
+            padding:.2rem .6rem; border-radius:20px; margin-bottom:.4rem; text-transform:uppercase; }
+.cta-title { font-size:1.05rem; font-weight:700; color:var(--text); margin-bottom:.2rem; line-height:1.3; }
+.cta-sub   { font-size:.85rem; color:var(--dim); }
+.dl-btn {
+  display:flex; align-items:center; gap:.5rem; white-space:nowrap;
+  background:linear-gradient(135deg,#58a6ff,#7c3aed);
+  color:#fff; font-weight:700; font-size:.9rem;
+  padding:.75rem 1.5rem; border-radius:10px;
+  text-decoration:none; flex-shrink:0;
+  transition:opacity .15s, transform .15s;
+  box-shadow:0 4px 20px rgba(88,166,255,.3);
+}
+.dl-btn:hover { opacity:.88; transform:translateY(-1px); }
 
 /* ── Grid ── */
 .grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;
@@ -167,22 +190,19 @@ footer a { color:var(--blue); text-decoration:none; }
   <h1>Runtime Security for AI Agents</h1>
   <p>MCP Warden intercepts every tool call an AI makes — blocking malicious commands, protecting credentials, and giving you full control before anything executes.</p>
 
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-n c-white">{{ total }}</div>
-      <div class="stat-l">Total Events</div>
-    </div>
-    <div class="stat">
-      <div class="stat-n c-red">{{ blocked }}</div>
-      <div class="stat-l">Blocked</div>
-    </div>
-    <div class="stat">
-      <div class="stat-n c-green">{{ allowed }}</div>
-      <div class="stat-l">Allowed</div>
-    </div>
-    <div class="stat">
-      <div class="stat-n c-red">{{ rate }}%</div>
-      <div class="stat-l">Block Rate</div>
+  <div class="cta-wrap">
+    <div class="cta-banner">
+      <div class="cta-icon">🧩</div>
+      <div class="cta-body">
+        <span class="cta-new">New · v1.0.0</span>
+        <div class="cta-title">MCP Warden — now packaged as a VS Code Extension</div>
+        <div class="cta-sub">Install directly in your editor and intercept AI agent calls with zero setup</div>
+      </div>
+      <a class="dl-btn"
+         href="https://github.com/MCPWarden/agent-firewall/releases/tag/v1.0.0"
+         target="_blank">
+        ⬇ Download v1.0.0
+      </a>
     </div>
   </div>
 </div>
