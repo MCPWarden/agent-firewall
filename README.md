@@ -135,6 +135,11 @@ The dashboard updates live via Server-Sent Events — no refresh needed.
 
 ### Landing Page A-Z about MCPWarden - Important Links
 <img width="631" height="655" alt="Image" src="https://github.com/user-attachments/assets/820cbb7d-5972-4d3f-a11f-a4a87fec79a4" />
+
+### How the MCPWarden Works?
+<img width="580" height="167" alt="Image" src="https://github.com/user-attachments/assets/bf93b40c-0358-4054-b646-8d77c022d64c" />
+<img width="555" height="168" alt="Image" src="https://github.com/user-attachments/assets/4087d665-bb77-42d2-9fb5-7c662484d23a" />
+<img width="270" height="417" alt="Image" src="https://github.com/user-attachments/assets/65df2627-e906-44fc-9697-2799465f2608" />
 ---
 
 ## Policy Configuration
