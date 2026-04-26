@@ -130,7 +130,10 @@ The dashboard updates live via Server-Sent Events — no refresh needed.
 - **Calls by Tool / Category** — Grouped bar charts with per-category colors
 - **Live activity feed** — Searchable, filterable table of every intercepted call
 
-![Realtime Monitoring Dashboard]()
+### Realtime Monitoring Dashboard
+<img width="1918" height="963" alt="Image" src="https://github.com/user-attachments/assets/150d74e7-380d-4be5-b6fa-ade3ee3909a2" />
+
+### Landing Page A-Z about MCPWarden - Important Links
 <img width="631" height="655" alt="Image" src="https://github.com/user-attachments/assets/820cbb7d-5972-4d3f-a11f-a4a87fec79a4" />
 ---
 
