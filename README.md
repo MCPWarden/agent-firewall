@@ -184,5 +184,3 @@ rules:
 - Chart.js
 - Google Gemini API (Gemma 4)
 - VS Code Extension API
-
----
