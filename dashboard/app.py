@@ -6,6 +6,7 @@ import queue
 import threading
 import time
 from collections import defaultdict
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 ROOT      = Path(__file__).parent.parent
@@ -25,6 +26,15 @@ _lock = threading.Lock()
 
 
 # ── Category inference for old log entries that predate the field ─────────────
+
+def _parse_ts(ts_str: str) -> datetime:
+    if not ts_str:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+    except Exception:
+        return datetime.min.replace(tzinfo=timezone.utc)
+
 
 def _infer_category(entry: dict) -> str:
     cat = entry.get("category")
@@ -146,6 +156,40 @@ def get_stats():
         if v in ("allow", "block"):
             timeline[ts][v] += 1
 
+    # ── Last-24h stats ────────────────────────────────────────────────────────
+    now    = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=24)
+    recent = [e for e in entries if _parse_ts(e.get("ts")) >= cutoff]
+
+    r_total   = len(recent)
+    r_allowed = sum(1 for e in recent if e.get("verdict") == "allow")
+    r_blocked = sum(1 for e in recent if e.get("verdict") == "block")
+
+    r_by_tool     = defaultdict(lambda: {"allow": 0, "block": 0})
+    r_by_category = defaultdict(lambda: {"allow": 0, "block": 0})
+    for e in recent:
+        v = e.get("verdict", "")
+        if v not in ("allow", "block"):
+            continue
+        r_by_tool[e.get("tool") or "unknown"][v]            += 1
+        r_by_category[e.get("category") or "unknown"][v]   += 1
+
+    hourly_map: dict = defaultdict(lambda: {"allow": 0, "block": 0})
+    for e in recent:
+        ts = _parse_ts(e.get("ts"))
+        hk = ts.replace(minute=0, second=0, microsecond=0).isoformat()
+        v  = e.get("verdict", "")
+        if v in ("allow", "block"):
+            hourly_map[hk][v] += 1
+
+    now_h  = now.replace(minute=0, second=0, microsecond=0)
+    hourly = []
+    for i in range(23, -1, -1):
+        t  = now_h - timedelta(hours=i)
+        hk = t.isoformat()
+        h  = hourly_map.get(hk, {"allow": 0, "block": 0})
+        hourly.append({"label": t.strftime("%H:00"), "allow": h["allow"], "block": h["block"]})
+
     return jsonify({
         "total":       total,
         "allowed":     allowed,
@@ -153,6 +197,14 @@ def get_stats():
         "by_tool":     dict(by_tool),
         "by_category": dict(by_category),
         "timeline":    dict(sorted(timeline.items())[-30:]),
+        "last_24h": {
+            "total":       r_total,
+            "allowed":     r_allowed,
+            "blocked":     r_blocked,
+            "hourly":      hourly,
+            "by_tool":     dict(r_by_tool),
+            "by_category": dict(r_by_category),
+        },
     })
 
 

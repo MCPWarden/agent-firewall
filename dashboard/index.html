@@ -297,6 +297,63 @@ body {
 .fbtn.active[data-cat="unknown"]    { background: rgba(100,116,139,.15); border-color: rgba(100,116,139,.4); color: #94a3b8;         }
 [data-theme="light"] .fbtn.active { filter: saturate(1.2); }
 
+/* ── Search bar ────────────────────────────────────────────────────────────── */
+.act-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.act-search {
+  flex: 1;
+  height: 34px;
+  padding: 0 14px 0 36px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: border-color .2s, background .2s;
+}
+.act-search::placeholder { color: var(--muted); }
+.act-search:focus { border-color: var(--border-hi); background: var(--card-hover); }
+.act-search-wrap {
+  position: relative;
+  flex: 1;
+}
+.act-search-wrap svg {
+  position: absolute;
+  left: 12px; top: 50%;
+  transform: translateY(-50%);
+  width: 14px; height: 14px;
+  stroke: var(--muted);
+  fill: none; stroke-width: 1.8;
+  pointer-events: none;
+}
+.act-clear {
+  position: absolute;
+  right: 11px; top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: var(--muted);
+  color: var(--bg);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: .7;
+  transition: opacity .15s;
+}
+.act-clear:hover { opacity: 1; }
+.act-clear.visible { display: flex; }
+
 /* ── Activity Table ────────────────────────────────────────────────────────── */
 .act-scroll {
   max-height: 380px; overflow-y: auto;
@@ -380,6 +437,36 @@ tr.new-block { animation: slideIn .25s ease, flashRed   1.8s ease forwards; }
 .cell-trunc { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .cell-time  { color: var(--dim); white-space: nowrap; }
 
+/* ── View toggle ─────────────────────────────────────────────────────────────── */
+.view-toggle {
+  display: flex;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 3px;
+  gap: 2px;
+}
+.vtbtn {
+  padding: 5px 16px;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.vtbtn:hover { color: var(--text); }
+.vtbtn.active {
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59,130,246,.35);
+}
+
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 footer {
   position: relative; z-index: 1;
@@ -421,10 +508,14 @@ footer {
     <div class="brand-mark">MW</div>
     <div class="brand-text">
       <span class="brand-name">MCPWarden</span>
-      <span class="brand-tagline">Agent Firewall Dashboard</span>
+      <span class="brand-tagline">The warden between AI agents and everything they shouldn't touch</span>
     </div>
   </div>
   <div class="topbar-right">
+    <div class="view-toggle">
+      <button class="vtbtn active" data-view="all"  onclick="setView('all')">All Time</button>
+      <button class="vtbtn"        data-view="24h"  onclick="setView('24h')">Last 24h</button>
+    </div>
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">
       <svg id="themeIcon" viewBox="0 0 24 24">
         <!-- sun (shown in dark mode to switch to light) -->
@@ -520,6 +611,13 @@ footer {
             <button class="fbtn" data-cat="unknown">Unknown</button>
           </div>
         </div>
+        <div class="act-search-row">
+          <div class="act-search-wrap">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="act-search" id="actSearch" type="text" placeholder="Search tools, details, reasons…" autocomplete="off">
+            <button class="act-clear" id="actClear" title="Clear">✕</button>
+          </div>
+        </div>
         <div class="act-scroll">
           <table class="act">
             <thead>
@@ -575,7 +673,8 @@ footer {
 const S = {
   total: 0, allowed: 0, blocked: 0,
   by_tool: {}, by_category: {}, timeline: {},
-  logs: [], filter: 'all',
+  last24h: { total: 0, allowed: 0, blocked: 0, hourly: [], by_tool: {}, by_category: {} },
+  logs: [], filter: 'all', view: 'all', search: '',
 };
 
 const $ = id => document.getElementById(id);
@@ -593,16 +692,9 @@ function fmtTime(ts) {
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 function isDark() { return document.documentElement.dataset.theme === 'dark'; }
+function gridColor()  { return isDark() ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.06)'; }
+function tickColor()  { return '#64748b'; }
 
-function chartColors() {
-  return {
-    grid:   isDark() ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.06)',
-    ticks:  '#64748b',
-    legend: isDark() ? '#94a3b8' : '#64748b',
-  };
-}
-
-// Moon SVG for light mode (switch to dark)
 const MOON_SVG = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
 const SUN_SVG  = `<circle cx="12" cy="12" r="5"/>
   <line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
@@ -611,117 +703,235 @@ const SUN_SVG  = `<circle cx="12" cy="12" r="5"/>
   <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
 
 function applyThemeUI() {
-  const dark = isDark();
-  $('themeIcon').innerHTML = dark ? SUN_SVG : MOON_SVG;
-  $('themeBtnLabel').textContent = dark ? 'Light Mode' : 'Dark Mode';
+  $('themeIcon').innerHTML = isDark() ? SUN_SVG : MOON_SVG;
+  $('themeBtnLabel').textContent = isDark() ? 'Light Mode' : 'Dark Mode';
 }
 
 function toggleTheme() {
-  const next = isDark() ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  localStorage.setItem('mw-theme', next);
+  document.documentElement.dataset.theme = isDark() ? 'light' : 'dark';
+  localStorage.setItem('mw-theme', document.documentElement.dataset.theme);
   applyThemeUI();
-
-  const c = chartColors();
-  Chart.defaults.color = c.ticks;
-
-  const updateScale = chart => {
-    ['x','y'].forEach(axis => {
-      if (chart.options.scales?.[axis]) {
-        chart.options.scales[axis].grid.color  = c.grid;
-        chart.options.scales[axis].ticks.color = c.ticks;
+  // Rebuild line gradients for new background
+  applyLineGradients();
+  // Sync scale colors across all charts
+  [lineChart, toolChart, catChart].forEach(ch => {
+    ['x','y'].forEach(ax => {
+      if (ch.options.scales?.[ax]) {
+        ch.options.scales[ax].grid.color  = gridColor();
+        ch.options.scales[ax].ticks.color = tickColor();
       }
     });
-    chart.update('none');
-  };
-  [lineChart, toolChart, catChart].forEach(updateScale);
+    ch.update('none');
+  });
   donutChart.update('none');
 }
 
-// Load saved theme
 const savedTheme = localStorage.getItem('mw-theme') || 'dark';
 document.documentElement.dataset.theme = savedTheme;
 applyThemeUI();
 
-// ── Chart defaults ────────────────────────────────────────────────────────────
+// ── Color palettes ────────────────────────────────────────────────────────────
+const CAT_FILL = {
+  filesystem: 'rgba(59,130,246,.75)',
+  network:    'rgba(139,92,246,.75)',
+  credential: 'rgba(245,158,11,.75)',
+  shell:      'rgba(6,182,212,.75)',
+  unknown:    'rgba(100,116,139,.75)',
+};
+const CAT_BORDER = {
+  filesystem: '#3b82f6',
+  network:    '#8b5cf6',
+  credential: '#f59e0b',
+  shell:      '#06b6d4',
+  unknown:    '#64748b',
+};
+const TOOL_LABELS = {
+  file_read:   'File Read',
+  file_write:  'File Write',
+  file_delete: 'File Delete',
+  bash:        'Bash',
+  fetch_url:   'Network Fetch',
+  env_read:    'Env Access',
+};
+function fmtTool(t) {
+  return TOOL_LABELS[t] || t.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Chart.js global defaults ──────────────────────────────────────────────────
 Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
 Chart.defaults.font.size   = 11;
-Chart.defaults.color       = chartColors().ticks;
+Chart.defaults.color       = tickColor();
 
-const TOOLTIP_OPTS = {
-  backgroundColor: isDark() ? 'rgba(4,6,15,.95)' : 'rgba(15,23,42,.92)',
-  borderColor:     isDark() ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.1)',
-  borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#94a3b8',
-  padding: 10, cornerRadius: 8, usePointStyle: true,
+function tooltipOpts() {
+  return {
+    backgroundColor: isDark() ? 'rgba(4,6,15,.96)' : 'rgba(15,23,42,.94)',
+    borderColor:     isDark() ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.1)',
+    borderWidth: 1,
+    titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+    padding: 12, cornerRadius: 10,
+    usePointStyle: true, boxPadding: 4,
+    callbacks: {
+      label: ctx => `  ${ctx.dataset.label}: ${ctx.parsed.y ?? ctx.parsed.x ?? 0}`,
+    },
+  };
+}
+
+// ── Donut center-text plugin ──────────────────────────────────────────────────
+const centerTextPlugin = {
+  id: 'centerText',
+  afterDraw(chart) {
+    if (chart.config.type !== 'doughnut') return;
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return;
+    const cx = (chartArea.left + chartArea.right)  / 2;
+    const cy = (chartArea.top  + chartArea.bottom) / 2;
+    const src = S.view === '24h' ? S.last24h : S;
+    const pct = src.total ? Math.round(src.blocked / src.total * 100) : 0;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.font = `800 30px 'Inter', sans-serif`;
+    ctx.fillStyle = isDark() ? '#f87171' : '#dc2626';
+    ctx.fillText(pct + '%', cx, cy - 11);
+
+    ctx.font = `500 11px 'Inter', sans-serif`;
+    ctx.fillStyle = '#64748b';
+    ctx.letterSpacing = '0.5px';
+    ctx.fillText('block rate', cx, cy + 13);
+
+    ctx.restore();
+  },
 };
 
-// ── Charts ────────────────────────────────────────────────────────────────────
-const c = chartColors();
+// ── Line chart canvas gradients ───────────────────────────────────────────────
+const lineCtx = $('lineChart').getContext('2d');
 
-const lineChart = new Chart($('lineChart'), {
+function makeGrad(ctx, r, g, b) {
+  const h = ctx.canvas.offsetHeight || 260;
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0,   `rgba(${r},${g},${b},0.22)`);
+  grad.addColorStop(0.6, `rgba(${r},${g},${b},0.06)`);
+  grad.addColorStop(1,   `rgba(${r},${g},${b},0.00)`);
+  return grad;
+}
+
+function applyLineGradients() {
+  lineChart.data.datasets[0].backgroundColor = makeGrad(lineCtx, 16,185,129);
+  lineChart.data.datasets[1].backgroundColor = makeGrad(lineCtx, 239,68,68);
+  lineChart.update('none');
+}
+
+// ── Chart initialisation ──────────────────────────────────────────────────────
+const gc = gridColor();
+
+const lineChart = new Chart(lineCtx, {
   type: 'line',
   data: { labels: [], datasets: [
-    { label:'Allowed', data:[], borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.07)',
-      fill:true, tension:.45, pointRadius:3, pointHoverRadius:6,
-      pointBackgroundColor:'#10b981', borderWidth:2 },
-    { label:'Blocked', data:[], borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.06)',
-      fill:true, tension:.45, pointRadius:3, pointHoverRadius:6,
-      pointBackgroundColor:'#ef4444', borderWidth:2 },
+    {
+      label: 'Allowed', data: [],
+      borderColor: '#10b981', borderWidth: 2.5,
+      fill: true, tension: 0.45,
+      pointRadius: 4, pointHoverRadius: 7,
+      pointBackgroundColor: '#10b981',
+      pointBorderColor: isDark() ? '#04060f' : '#f1f5f9',
+      pointBorderWidth: 2,
+      borderCapStyle: 'round',
+    },
+    {
+      label: 'Blocked', data: [],
+      borderColor: '#ef4444', borderWidth: 2.5,
+      fill: true, tension: 0.45,
+      pointRadius: 4, pointHoverRadius: 7,
+      pointBackgroundColor: '#ef4444',
+      pointBorderColor: isDark() ? '#04060f' : '#f1f5f9',
+      pointBorderWidth: 2,
+      borderCapStyle: 'round',
+    },
   ]},
   options: {
-    responsive:true,
-    interaction:{ mode:'index', intersect:false },
-    plugins:{ legend:{ position:'top', labels:{ padding:16, boxWidth:10, usePointStyle:true, pointStyle:'circle' }}, tooltip: TOOLTIP_OPTS },
-    scales:{
-      x:{ grid:{ color: c.grid }, ticks:{ color: c.ticks, maxTicksLimit:10 }},
-      y:{ grid:{ color: c.grid }, ticks:{ color: c.ticks, stepSize:1 }, beginAtZero:true },
+    responsive: true,
+    animation: { duration: 600, easing: 'easeInOutQuart' },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top', labels: { padding: 18, boxWidth: 10, usePointStyle: true, pointStyle: 'circle' } },
+      tooltip: tooltipOpts(),
+    },
+    scales: {
+      x: { grid: { color: gc }, ticks: { color: tickColor(), maxTicksLimit: 10 } },
+      y: { grid: { color: gc }, ticks: { color: tickColor(), stepSize: 1 }, beginAtZero: true },
     },
   },
 });
+applyLineGradients();
 
 const donutChart = new Chart($('donutChart'), {
-  type:'doughnut',
-  data:{ labels:['Allowed','Blocked'], datasets:[{
-    data:[0,0],
-    backgroundColor:['rgba(16,185,129,.75)','rgba(239,68,68,.75)'],
-    borderColor:['rgba(16,185,129,1)','rgba(239,68,68,1)'],
-    borderWidth:2, hoverOffset:6,
-  }]},
-  options:{
-    responsive:true, cutout:'70%',
-    plugins:{ legend:{ position:'bottom', labels:{ padding:20, boxWidth:10, usePointStyle:true, pointStyle:'circle' }}, tooltip: TOOLTIP_OPTS },
+  type: 'doughnut',
+  plugins: [centerTextPlugin],
+  data: {
+    labels: ['Allowed', 'Blocked'],
+    datasets: [{
+      data: [0, 0],
+      backgroundColor: ['rgba(16,185,129,.8)', 'rgba(239,68,68,.8)'],
+      borderColor:     ['#10b981', '#ef4444'],
+      borderWidth: 2,
+      hoverOffset: 10,
+      hoverBorderWidth: 3,
+    }],
+  },
+  options: {
+    responsive: true,
+    cutout: '65%',
+    animation: { animateRotate: true, animateScale: false, duration: 700, easing: 'easeInOutQuart' },
+    plugins: {
+      legend: { position: 'bottom', labels: { padding: 22, boxWidth: 10, usePointStyle: true, pointStyle: 'circle' } },
+      tooltip: tooltipOpts(),
+    },
   },
 });
 
 const toolChart = new Chart($('toolChart'), {
-  type:'bar',
-  data:{ labels:[], datasets:[
-    { label:'Allowed', data:[], backgroundColor:'rgba(16,185,129,.7)', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
-    { label:'Blocked', data:[], backgroundColor:'rgba(239,68,68,.7)',  borderColor:'#ef4444', borderWidth:1, borderRadius:4 },
+  type: 'bar',
+  data: { labels: [], datasets: [
+    { label: 'Allowed', data: [], backgroundColor: 'rgba(16,185,129,.8)', borderColor: '#10b981', borderWidth: 0, borderRadius: 4, borderSkipped: 'bottom' },
+    { label: 'Blocked', data: [], backgroundColor: 'rgba(239,68,68,.8)',  borderColor: '#ef4444', borderWidth: 0, borderRadius: 4, borderSkipped: 'bottom' },
   ]},
-  options:{
-    responsive:true,
-    scales:{
-      x:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks, maxRotation:0 }},
-      y:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks, stepSize:1 }, beginAtZero:true },
+  options: {
+    responsive: true,
+    animation: { duration: 500, easing: 'easeOutQuart' },
+    scales: {
+      x: { grid: { color: gc, display: false }, ticks: { color: tickColor(), maxRotation: 0 } },
+      y: { grid: { color: gc }, ticks: { color: tickColor(), stepSize: 1 }, beginAtZero: true, border: { dash: [4,4] } },
     },
-    plugins:{ legend:{ position:'top', labels:{ padding:14, boxWidth:10, usePointStyle:true, pointStyle:'circle' }}, tooltip: TOOLTIP_OPTS },
+    plugins: {
+      legend: { position: 'top', labels: { padding: 16, boxWidth: 10, usePointStyle: true, pointStyle: 'circle' } },
+      tooltip: tooltipOpts(),
+    },
   },
 });
 
 const catChart = new Chart($('catChart'), {
-  type:'bar',
-  data:{ labels:[], datasets:[
-    { label:'Allowed', data:[], backgroundColor:'rgba(16,185,129,.7)', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
-    { label:'Blocked', data:[], backgroundColor:'rgba(239,68,68,.7)',  borderColor:'#ef4444', borderWidth:1, borderRadius:4 },
+  type: 'bar',
+  data: { labels: [], datasets: [
+    { label: 'Allowed', data: [], backgroundColor: [], borderColor: [], borderWidth: 0, borderRadius: 4, borderSkipped: 'left' },
+    { label: 'Blocked', data: [], backgroundColor: 'rgba(239,68,68,.8)', borderColor: '#ef4444', borderWidth: 0, borderRadius: 4, borderSkipped: 'left' },
   ]},
-  options:{
-    indexAxis:'y', responsive:true,
-    scales:{
-      x:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks, stepSize:1 }, beginAtZero:true },
-      y:{ stacked:true, grid:{ color: c.grid }, ticks:{ color: c.ticks }},
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    animation: { duration: 500, easing: 'easeOutQuart' },
+    scales: {
+      x: { grid: { color: gc }, ticks: { color: tickColor(), stepSize: 1 }, beginAtZero: true, border: { dash: [4,4] } },
+      y: { grid: { color: gc, display: false }, ticks: { color: tickColor() } },
     },
-    plugins:{ legend:{ display:false }, tooltip: TOOLTIP_OPTS },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        ...tooltipOpts(),
+        callbacks: { label: ctx => `  ${ctx.dataset.label}: ${ctx.parsed.x ?? 0}` },
+      },
+    },
   },
 });
 
@@ -729,12 +939,11 @@ const catChart = new Chart($('catChart'), {
 function animateVal(el, target, suffix) {
   const from = parseInt(el.textContent) || 0;
   if (from === target) { el.textContent = target + (suffix||''); return; }
-  const steps = Math.min(Math.abs(target-from), 20);
+  const steps = Math.min(Math.abs(target - from), 24);
   const inc = (target - from) / steps;
   let v = from, s = 0;
   const tick = () => {
-    s++;
-    v += inc;
+    s++; v += inc;
     el.textContent = Math.round(s < steps ? v : target) + (suffix||'');
     if (s < steps) requestAnimationFrame(tick);
   };
@@ -742,38 +951,64 @@ function animateVal(el, target, suffix) {
 }
 
 function renderStats() {
-  const rate = S.total ? Math.round(S.blocked / S.total * 100) : 0;
-  animateVal($('sTotal'),   S.total,   '');
-  animateVal($('sAllowed'), S.allowed, '');
-  animateVal($('sBlocked'), S.blocked, '');
+  const d = S.view === '24h' ? S.last24h : S;
+  const rate = d.total ? Math.round(d.blocked / d.total * 100) : 0;
+  animateVal($('sTotal'),   d.total,   '');
+  animateVal($('sAllowed'), d.allowed, '');
+  animateVal($('sBlocked'), d.blocked, '');
   $('sRate').textContent = rate + '%';
 }
 
+function setView(v) {
+  S.view = v;
+  document.querySelectorAll('.vtbtn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  renderStats();
+  renderCharts();
+}
+
+let _firstRender = true;
+
 function renderCharts() {
+  const mode = _firstRender ? undefined : 'none';
+  _firstRender = false;
+
+  const d = S.view === '24h' ? S.last24h : S;
+
   // Donut
-  donutChart.data.datasets[0].data = [S.allowed, S.blocked];
-  donutChart.update('none');
+  donutChart.data.datasets[0].data = [d.allowed, d.blocked];
+  donutChart.update(mode);
 
-  // Line
-  const labels = Object.keys(S.timeline).sort().slice(-30);
-  lineChart.data.labels            = labels.map(k => k.slice(11,16));
-  lineChart.data.datasets[0].data  = labels.map(k => S.timeline[k]?.allow || 0);
-  lineChart.data.datasets[1].data  = labels.map(k => S.timeline[k]?.block || 0);
-  lineChart.update('none');
+  // Line — hourly buckets for 24h, minute timeline for all-time
+  if (S.view === '24h') {
+    const h = d.hourly || [];
+    lineChart.data.labels           = h.map(x => x.label);
+    lineChart.data.datasets[0].data = h.map(x => x.allow || 0);
+    lineChart.data.datasets[1].data = h.map(x => x.block || 0);
+  } else {
+    const tKeys = Object.keys(S.timeline).sort().slice(-30);
+    lineChart.data.labels           = tKeys.map(k => k.slice(11,16));
+    lineChart.data.datasets[0].data = tKeys.map(k => S.timeline[k]?.allow || 0);
+    lineChart.data.datasets[1].data = tKeys.map(k => S.timeline[k]?.block || 0);
+  }
+  lineChart.update(mode);
 
-  // Tool bar
-  const tools = Object.keys(S.by_tool).sort();
-  toolChart.data.labels            = tools;
-  toolChart.data.datasets[0].data  = tools.map(t => S.by_tool[t]?.allow || 0);
-  toolChart.data.datasets[1].data  = tools.map(t => S.by_tool[t]?.block || 0);
-  toolChart.update('none');
+  // Tool bar — grouped side-by-side, human-readable labels
+  const byTool = d.by_tool || {};
+  const tools  = Object.keys(byTool).sort();
+  toolChart.data.labels           = tools.map(fmtTool);
+  toolChart.data.datasets[0].data = tools.map(t => byTool[t]?.allow || 0);
+  toolChart.data.datasets[1].data = tools.map(t => byTool[t]?.block || 0);
+  toolChart.update(mode);
 
-  // Category bar
-  const cats = Object.keys(S.by_category).sort();
-  catChart.data.labels            = cats;
-  catChart.data.datasets[0].data  = cats.map(c => S.by_category[c]?.allow || 0);
-  catChart.data.datasets[1].data  = cats.map(c => S.by_category[c]?.block || 0);
-  catChart.update('none');
+  // Category bar — grouped, per-category colors for allowed bars
+  const byCat = d.by_category || {};
+  const cats  = Object.keys(byCat).sort();
+  catChart.data.labels                      = cats.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+  catChart.data.datasets[0].data            = cats.map(c => byCat[c]?.allow || 0);
+  catChart.data.datasets[0].backgroundColor = cats.map(c => CAT_FILL[c]   || 'rgba(100,116,139,.8)');
+  catChart.data.datasets[0].borderColor     = cats.map(c => CAT_BORDER[c] || '#64748b');
+  catChart.data.datasets[1].data            = cats.map(c => byCat[c]?.block || 0);
+  catChart.update(mode);
 }
 
 function makeRow(e, isNew) {
@@ -791,13 +1026,20 @@ function makeRow(e, isNew) {
   return tr;
 }
 
+function matchesSearch(e) {
+  const q = S.search.toLowerCase();
+  if (!q) return true;
+  return [e.tool, e.category, e.verdict, e.detail, e.reason]
+    .some(v => (v||'').toLowerCase().includes(q));
+}
+
 function renderTable(prepend) {
   const body = $('actBody');
   const f    = S.filter;
 
   if (prepend !== undefined) {
     const cat = prepend.category || 'unknown';
-    if (f === 'all' || cat === f) {
+    if ((f === 'all' || cat === f) && matchesSearch(prepend)) {
       const empty = body.querySelector('.empty-row');
       if (empty) body.innerHTML = '';
       body.insertBefore(makeRow(prepend, true), body.firstChild);
@@ -806,9 +1048,14 @@ function renderTable(prepend) {
     return;
   }
 
-  const visible = f === 'all' ? S.logs : S.logs.filter(e => (e.category||'unknown') === f);
+  let visible = f === 'all' ? S.logs : S.logs.filter(e => (e.category||'unknown') === f);
+  if (S.search) visible = visible.filter(matchesSearch);
+
   if (!visible.length) {
-    body.innerHTML = `<tr class="empty-row"><td colspan="6">No ${f === 'all' ? '' : f + ' '}activity yet.</td></tr>`;
+    const msg = S.search
+      ? `No results for "${esc(S.search)}".`
+      : `No ${f === 'all' ? '' : f + ' '}activity yet.`;
+    body.innerHTML = `<tr class="empty-row"><td colspan="6">${msg}</td></tr>`;
     return;
   }
   body.innerHTML = '';
@@ -820,10 +1067,17 @@ async function boot() {
   try {
     const [sr, lr] = await Promise.all([fetch('/api/stats'), fetch('/api/logs')]);
     const stats = await sr.json(), logs = await lr.json();
+    const l = stats.last_24h || {};
     Object.assign(S, {
       total: stats.total, allowed: stats.allowed, blocked: stats.blocked,
-      by_tool: stats.by_tool, by_category: stats.by_category,
-      timeline: stats.timeline || {}, logs,
+      by_tool: stats.by_tool || {}, by_category: stats.by_category || {},
+      timeline: stats.timeline || {},
+      last24h: {
+        total: l.total || 0, allowed: l.allowed || 0, blocked: l.blocked || 0,
+        hourly: l.hourly || [],
+        by_tool: l.by_tool || {}, by_category: l.by_category || {},
+      },
+      logs,
     });
     renderStats(); renderCharts(); renderTable();
   } catch(e) { console.error('boot:', e); }
@@ -849,6 +1103,17 @@ function connectSSE() {
       S.by_category[cat] ||= { allow:0, block:0 };
       S.timeline[min]    ||= { allow:0, block:0 };
       S.by_tool[t][v]++; S.by_category[cat][v]++; S.timeline[min][v]++;
+
+      // 24h — new SSE events are always within the last 24h
+      S.last24h.total++;
+      if (v === 'allow') S.last24h.allowed++; else S.last24h.blocked++;
+      S.last24h.by_tool[t]       ||= { allow:0, block:0 };
+      S.last24h.by_category[cat] ||= { allow:0, block:0 };
+      S.last24h.by_tool[t][v]++;
+      S.last24h.by_category[cat][v]++;
+      const hourLabel = new Date(e.ts || Date.now()).toISOString().slice(11,13) + ':00';
+      const bucket = S.last24h.hourly.find(h => h.label === hourLabel);
+      if (bucket) bucket[v] = (bucket[v] || 0) + 1;
     }
     renderStats(); renderCharts(); renderTable(e);
   };
@@ -862,6 +1127,20 @@ document.querySelectorAll('.fbtn').forEach(btn => {
     S.filter = btn.dataset.cat;
     renderTable();
   });
+});
+
+// ── Search ────────────────────────────────────────────────────────────────────
+$('actSearch').addEventListener('input', () => {
+  S.search = $('actSearch').value;
+  $('actClear').classList.toggle('visible', S.search.length > 0);
+  renderTable();
+});
+$('actClear').addEventListener('click', () => {
+  $('actSearch').value = '';
+  S.search = '';
+  $('actClear').classList.remove('visible');
+  renderTable();
+  $('actSearch').focus();
 });
 
 boot().then(connectSSE);
